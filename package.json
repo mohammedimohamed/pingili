@@ -1,0 +1,27 @@
+{
+  "name": "pingili",
+  "version": "1.0.0",
+  "description": "Pingili — Universal Digital Pager & Virtual Queue Notification Platform",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:pwa": "npm run dev --workspace=apps/client_pwa",
+    "build:pwa": "npm run build --workspace=apps/client_pwa",
+    "lint:pwa": "npm run lint --workspace=apps/client_pwa",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:db:reset": "supabase db reset"
+  },
+  "keywords": [
+    "digital-pager",
+    "queue-management",
+    "pwa",
+    "flutter",
+    "supabase",
+    "realtime"
+  ],
+  "author": "Pingili Team",
+  "license": "MIT"
+}

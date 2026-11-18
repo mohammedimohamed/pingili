@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/ticket.dart';
+import '../models/pairing_session.dart';
 import '../providers/queue_provider.dart';
+import '../providers/pairing_provider.dart';
 import 'qr_modal.dart';
 
 class QueueDashboardScreen extends ConsumerStatefulWidget {
@@ -98,6 +100,7 @@ class _QueueDashboardScreenState extends ConsumerState<QueueDashboardScreen> {
   Widget build(BuildContext context) {
     final business = ref.watch(currentBusinessProvider);
     final queueState = ref.watch(queueProvider);
+    final waitingPairs = ref.watch(pairingQueueProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFF020617),
@@ -165,7 +168,11 @@ class _QueueDashboardScreenState extends ConsumerState<QueueDashboardScreen> {
           ),
         ],
       ),
-      body: queueState.when(
+      body: Column(
+        children: [
+          if (waitingPairs.isNotEmpty) _buildWaitingToPairBar(waitingPairs),
+          Expanded(
+            child: queueState.when(
         loading: () => const Center(
           child: CircularProgressIndicator(color: Color(0xFFF97316)),
         ),
@@ -214,6 +221,72 @@ class _QueueDashboardScreenState extends ConsumerState<QueueDashboardScreen> {
 
           return _buildKanbanView(activeTickets);
         },
+      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWaitingToPairBar(List<PairingSession> sessions) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F172A),
+        border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.bolt, color: Color(0xFFF97316), size: 18),
+          const SizedBox(width: 6),
+          const Text(
+            'Waiting to Pair (Tap):',
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: sessions.map((session) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ActionChip(
+                      backgroundColor: const Color(0xFF1E293B),
+                      side: const BorderSide(color: Color(0xFFF97316)),
+                      avatar: const Icon(Icons.smartphone, size: 16, color: Color(0xFFF97316)),
+                      label: Text(
+                        session.visitCount > 1
+                            ? '${session.pairingCode} • Visit #${session.visitCount}'
+                            : '${session.pairingCode} • New',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                          fontSize: 13,
+                        ),
+                      ),
+                      onPressed: () async {
+                        final ticket = await ref
+                            .read(pairingQueueProvider.notifier)
+                            .pairSession(session);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Paired ${session.pairingCode} → Ticket ${ticket.displayNumber}'),
+                            backgroundColor: const Color(0xFF10B981),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

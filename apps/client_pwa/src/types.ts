@@ -25,3 +25,15 @@ export interface Ticket {
   completed_at?: string | null;
   business?: Business;
 }
+
+export interface PairingSession {
+  id: string;
+  business_id: string;
+  pairing_code: string;
+  client_session_id: string;
+  visit_count: number;
+  status: 'waiting_pair' | 'paired' | 'expired';
+  ticket_id?: string | null;
+  ticket_token?: string | null;
+  business?: Business;
+}

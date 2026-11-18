@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Ticket, Business, TicketStatus } from '../types';
+import type { Ticket, Business, TicketStatus, PairingSession } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -189,4 +189,106 @@ export function devSimulateStatus(token: string, newStatus: TicketStatus): void 
     if (newStatus === 'completed') mockTickets[token].completed_at = new Date().toISOString();
     mockListeners.forEach(listener => listener({ ...mockTickets[token] }));
   }
+}
+
+// ============================================================================
+// Passive Counter QR Pairing & Returning Device Recognition
+// ============================================================================
+
+const mockPairingListeners = new Set<(ticket: Ticket) => void>();
+
+export async function requestPairing(businessSlug: string): Promise<PairingSession> {
+  const sessionId = getClientSessionId();
+
+  if (isLiveSupabaseConfigured && supabase) {
+    const { data, error } = await supabase.rpc('request_pairing', {
+      p_business_slug: businessSlug,
+      p_client_session_id: sessionId
+    });
+    if (error) throw error;
+
+    const { data: biz } = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('slug', businessSlug)
+      .maybeSingle();
+
+    return {
+      ...(data as PairingSession),
+      business: (biz as Business) || DEMO_BUSINESS
+    };
+  }
+
+  // Mock returning device counter in localStorage
+  const visitKey = `pingili_visits_${businessSlug}`;
+  const visits = parseInt(localStorage.getItem(visitKey) || '0', 10) + 1;
+  localStorage.setItem(visitKey, String(visits));
+
+  const code = String(Math.floor(1000 + Math.random() * 9000));
+  return {
+    id: 'pair-' + Date.now(),
+    business_id: DEMO_BUSINESS.id,
+    pairing_code: code,
+    client_session_id: sessionId,
+    visit_count: visits,
+    status: 'waiting_pair',
+    business: DEMO_BUSINESS
+  };
+}
+
+export function subscribeToPairing(
+  pairingId: string,
+  onPaired: (ticket: Ticket) => void
+): () => void {
+  if (isLiveSupabaseConfigured && supabase) {
+    const channel = supabase
+      .channel(`pairing_${pairingId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'pairing_sessions',
+          filter: `id=eq.${pairingId}`
+        },
+        async (payload) => {
+          const updated = payload.new as PairingSession;
+          if (updated.status === 'paired' && updated.ticket_id && supabase) {
+            const { data } = await supabase
+              .from('tickets')
+              .select('*, business:businesses(*)')
+              .eq('id', updated.ticket_id)
+              .maybeSingle();
+            if (data) onPaired(data as unknown as Ticket);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }
+
+  mockPairingListeners.add(onPaired);
+  return () => {
+    mockPairingListeners.delete(onPaired);
+  };
+}
+
+export function devSimulatePairSuccess(): void {
+  const newTicket: Ticket = {
+    id: 't-044',
+    business_id: DEMO_BUSINESS.id,
+    short_token: 'demo044',
+    sequence_number: 44,
+    display_number: '#044',
+    custom_label: 'Counter Check-In',
+    status: 'waiting',
+    is_connected: true,
+    created_at: new Date().toISOString(),
+    business: DEMO_BUSINESS
+  };
+  mockTickets['demo044'] = newTicket;
+  mockPairingListeners.forEach(listener => listener(newTicket));
 }

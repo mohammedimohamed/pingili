@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ticket.dart';
 import '../models/business.dart';
 import '../core/supabase_client.dart';
@@ -194,6 +195,18 @@ class QueueNotifier extends StateNotifier<AsyncValue<List<Ticket>>> {
   }
 
   Future<void> rePingTicket(String ticketId) async {
+    if (SupabaseConfig.isLiveConfigured && SupabaseConfig.client != null) {
+      await SupabaseConfig.client!
+          .from('tickets')
+          .update({
+            'notified_at': DateTime.now().toIso8601String(),
+            'acknowledged_at': null,
+          })
+          .eq('id', ticketId);
+      await _refreshFromDb();
+      return;
+    }
+
     final currentList = state.value ?? [];
     final updatedList = currentList.map((t) {
       if (t.id == ticketId) {

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Ticket, Business, TicketStatus, PairingSession } from '../types';
+import { getOrRestoreClientSessionId, getDeviceFingerprint } from './clientIdentity';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -198,12 +199,15 @@ export function devSimulateStatus(token: string, newStatus: TicketStatus): void 
 const mockPairingListeners = new Set<(ticket: Ticket) => void>();
 
 export async function requestPairing(businessSlug: string): Promise<PairingSession> {
-  const sessionId = getClientSessionId();
+  const sessionId = await getOrRestoreClientSessionId();
+  const { fingerprint, meta } = await getDeviceFingerprint();
 
   if (isLiveSupabaseConfigured && supabase) {
     const { data, error } = await supabase.rpc('request_pairing', {
       p_business_slug: businessSlug,
-      p_client_session_id: sessionId
+      p_client_session_id: sessionId,
+      p_device_fingerprint: fingerprint,
+      p_device_meta: meta
     });
     if (error) throw error;
 

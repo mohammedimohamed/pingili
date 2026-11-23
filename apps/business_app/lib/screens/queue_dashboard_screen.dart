@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import '../core/supabase_client.dart';
 import '../models/ticket.dart';
 import '../models/pairing_session.dart';
 import '../providers/queue_provider.dart';
@@ -140,6 +142,74 @@ class _QueueDashboardScreenState extends ConsumerState<QueueDashboardScreen> {
           ],
         ),
         actions: [
+          // Counter QR Button (Passive Check-In QR)
+          IconButton(
+            icon: const Icon(Icons.qr_code_2, color: Color(0xFFF97316)),
+            tooltip: 'Show Counter QR',
+            onPressed: () {
+              final counterUrl = '${SupabaseConfig.pwaBaseUrl}/b/${business.slug}';
+              showDialog(
+                context: context,
+                builder: (ctx) => Dialog(
+                  backgroundColor: const Color(0xFF0F172A),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 360),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            business.name,
+                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Scan to get your digital pager',
+                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                          ),
+                          const SizedBox(height: 20),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: QrImageView(
+                              data: counterUrl,
+                              version: QrVersions.auto,
+                              size: 210,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          SelectableText(
+                            counterUrl,
+                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 11, fontFamily: 'monospace'),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF97316),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                              onPressed: () => Navigator.of(ctx).pop(),
+                              child: const Text('Close'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
           // View Switcher (Kanban vs List)
           IconButton(
             icon: Icon(

@@ -1,21 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/supabase_client.dart';
+import 'models/business.dart';
+import 'providers/queue_provider.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/queue_dashboard_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseConfig.initialize();
 
+  Business? initialBusiness;
+  bool needsOnboarding = false;
+
+  if (SupabaseConfig.isLiveConfigured && SupabaseConfig.client != null) {
+    final client = SupabaseConfig.client!;
+    final user = client.auth.currentUser;
+    if (user != null) {
+      final data = await client
+          .from('businesses')
+          .select()
+          .eq('owner_id', user.id)
+          .maybeSingle();
+      if (data != null) {
+        initialBusiness = Business.fromJson(data);
+      } else {
+        needsOnboarding = true;
+      }
+    } else {
+      needsOnboarding = true;
+    }
+  }
+
   runApp(
-    const ProviderScope(
-      child: PingiliBusinessApp(),
+    ProviderScope(
+      overrides: [
+        if (initialBusiness != null)
+          currentBusinessProvider.overrideWith((ref) => initialBusiness!),
+      ],
+      child: PingiliBusinessApp(needsOnboarding: needsOnboarding),
     ),
   );
 }
 
 class PingiliBusinessApp extends StatelessWidget {
-  const PingiliBusinessApp({super.key});
+  final bool needsOnboarding;
+
+  const PingiliBusinessApp({super.key, this.needsOnboarding = false});
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +63,7 @@ class PingiliBusinessApp extends StatelessWidget {
           surface: Color(0xFF0F172A),
         ),
       ),
-      home: const QueueDashboardScreen(),
+      home: needsOnboarding ? const OnboardingScreen() : const QueueDashboardScreen(),
     );
   }
 }
